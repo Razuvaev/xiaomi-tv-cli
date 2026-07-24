@@ -60,3 +60,34 @@ def disconnect(ip_address: str, port: int = 5555) -> ADBResult:
 
 def devices() -> ADBResult:
     return run("devices")
+
+def shell(*arguments: str, timeout: float = 15) -> ADBResult:
+    return run("shell", *arguments, timeout=timeout)
+
+
+def get_property(name: str) -> str:
+    result = shell("getprop", name)
+
+    if result.return_code != 0:
+        raise ADBError(result.output or f"Failed to read property: {name}")
+
+    return result.stdout.strip()
+
+
+def get_home_launcher() -> str:
+    result = shell(
+        "cmd",
+        "package",
+        "resolve-activity",
+        "--brief",
+        "-a",
+        "android.intent.action.MAIN",
+        "-c",
+        "android.intent.category.HOME",
+    )
+
+    if result.return_code != 0:
+        raise ADBError(result.output or "Failed to resolve the HOME launcher.")
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return lines[-1] if lines else "Unknown"    

@@ -4,6 +4,7 @@ import ipaddress
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from tvctl import adb
 
@@ -78,6 +79,56 @@ def connect(
         console.print(result.output)
 
     raise typer.Exit(code=result.return_code or 1)
+
+@app.command()
+def status() -> None:
+    """Show information about the connected Android TV device."""
+    try:
+        devices_result = adb.devices()
+    except adb.ADBError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    connected_devices = []
+
+    for line in devices_result.stdout.splitlines()[1:]:
+        columns = line.split()
+
+        if len(columns) >= 2 and columns[1] == "device":
+            connected_devices.append(columns[0])
+
+    if not connected_devices:
+        console.print("[yellow]⚠ No connected Android TV devices found.[/yellow]")
+        console.print("Run [cyan]tvctl connect <IP>[/cyan] first.")
+        raise typer.Exit(code=1)
+
+    if len(connected_devices) > 1:
+        console.print("[yellow]⚠ Multiple ADB devices are connected.[/yellow]")
+        console.print("Disconnect unnecessary devices and run the command again.")
+        raise typer.Exit(code=1)
+
+    try:
+        model = adb.get_property("ro.product.model") or "Unknown"
+        manufacturer = adb.get_property("ro.product.manufacturer") or "Unknown"
+        android_version = adb.get_property("ro.build.version.release") or "Unknown"
+        sdk_version = adb.get_property("ro.build.version.sdk") or "Unknown"
+        launcher = adb.get_home_launcher()
+    except adb.ADBError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    table = Table(title="Android TV Status", show_header=False)
+    table.add_column("Property", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Device", connected_devices[0])
+    table.add_row("Manufacturer", manufacturer)
+    table.add_row("Model", model)
+    table.add_row("Android", android_version)
+    table.add_row("SDK", sdk_version)
+    table.add_row("Home launcher", launcher)
+
+    console.print(table)    
 
 
 if __name__ == "__main__":
