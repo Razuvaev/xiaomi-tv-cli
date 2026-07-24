@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=75,<77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "xiaomi-tv-cli"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI utility for diagnosing and optimizing Xiaomi Android TV devices over ADB."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = { file = "LICENSE" }
 authors = [
     { name = "Pavel Razuvaev" }
 ]
