@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import ipaddress
+from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
-from tvctl import adb
+from tvctl import adb, doctor
+from tvctl.profiles import ProfileError
 
 app = typer.Typer(
     name="tvctl",
@@ -128,7 +132,61 @@ def status() -> None:
     table.add_row("SDK", sdk_version)
     table.add_row("Home launcher", launcher)
 
-    console.print(table)    
+    console.print(table)
+
+@app.command(name="doctor")
+def doctor_command(
+    profile: Annotated[
+        Path,
+        typer.Option(
+            "--profile",
+            "-p",
+            help="Path to an optimization profile.",
+        ),
+    ] = Path("profiles/safe.yaml"),
+) -> None:
+    """Check optimization status and show a health score."""
+    try:
+        report = doctor.run(profile)
+    except (adb.ADBError, ProfileError) as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    table = Table(title=f"{report.profile.name} profile")
+    table.add_column("Status")
+    table.add_column("Component")
+    table.add_column("Category")
+    table.add_column("Package", style="dim")
+
+    for result in report.packages:
+        if not result.installed:
+            status = "[dim]— Not installed[/dim]"
+        elif result.enabled:
+            status = "[yellow]⚠ Enabled[/yellow]"
+        else:
+            status = "[green]✓ Disabled[/green]"
+
+        table.add_row(
+            status,
+            result.title,
+            result.category,
+            result.name,
+        )
+
+    console.print(table)
+
+    score_color = "green" if report.score >= 90 else "yellow" if report.score >= 60 else "red"
+
+    console.print(
+        Panel(
+            f"[bold {score_color}]{report.score} / 100[/bold {score_color}]\n"
+            f"{report.optimized_count} of {len(report.packages)} components optimized",
+            title="Optimization score",
+        )
+    )
+
+    if report.score < 100:
+        console.print("Run [cyan]tvctl optimize[/cyan] to apply this profile.")        
 
 
 if __name__ == "__main__":
