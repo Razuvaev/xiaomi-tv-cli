@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from tvctl import adb, doctor, optimizer, restorer
+from tvctl import adb, discovery, doctor, optimizer, restorer
 from tvctl.profiles import ProfileError
 
 app = typer.Typer(
@@ -331,6 +331,70 @@ def restore(
         raise typer.Exit(code=1)
 
     console.print("[bold green]✓ Restore completed successfully.[/bold green]")    
+
+@app.command()
+def discover(
+    port: Annotated[
+        int,
+        typer.Option(
+            "--port",
+            "-p",
+            min=1,
+            max=65535,
+            help="ADB TCP port.",
+        ),
+    ] = discovery.DEFAULT_ADB_PORT,
+    timeout: Annotated[
+        float,
+        typer.Option(
+            "--timeout",
+            min=0.05,
+            max=5,
+            help="Connection timeout for each IP address.",
+        ),
+    ] = discovery.DEFAULT_TIMEOUT,
+) -> None:
+    """Find Android TV devices with wireless ADB enabled."""
+    try:
+        network = discovery.get_default_network()
+    except discovery.DiscoveryError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    console.print(f"[cyan]Scanning {network} on port {port}...[/cyan]")
+
+    try:
+        devices = discovery.discover(
+            network=network,
+            port=port,
+            timeout=timeout,
+        )
+    except discovery.DiscoveryError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    if not devices:
+        console.print("[yellow]⚠ No devices with wireless ADB found.[/yellow]")
+        console.print(
+            "Make sure the TV is awake and USB debugging is enabled."
+        )
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"Found {len(devices)} device(s)")
+    table.add_column("#", justify="right", style="cyan")
+    table.add_column("IP address")
+    table.add_column("Port", justify="right")
+    table.add_column("Target", style="green")
+
+    for index, device in enumerate(devices, start=1):
+        table.add_row(
+            str(index),
+            device.ip_address,
+            str(device.port),
+            device.target,
+        )
+
+    console.print(table)    
 
 
 if __name__ == "__main__":
