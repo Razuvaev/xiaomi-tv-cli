@@ -6,6 +6,8 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
+from tvctl import adb
+
 DEFAULT_ADB_PORT = 5555
 DEFAULT_TIMEOUT = 0.15
 DEFAULT_WORKERS = 64
@@ -19,6 +21,9 @@ class DiscoveryError(RuntimeError):
 class DiscoveredDevice:
     ip_address: str
     port: int = DEFAULT_ADB_PORT
+    manufacturer: str = "Unknown"
+    model: str = "Unknown"
+    android_version: str = "Unknown"
 
     @property
     def target(self) -> str:
@@ -129,3 +134,50 @@ def discover(
             key=lambda device: ipaddress.ip_address(device.ip_address),
         )
     )
+
+def get_device_property(target: str, property_name: str) -> str:
+    result = adb.run("-s", target, "shell", "getprop", property_name, timeout=10)
+
+    if result.return_code != 0:
+        return "Unknown"
+
+    return result.stdout.strip() or "Unknown"
+
+
+def identify_device(device: DiscoveredDevice) -> DiscoveredDevice:
+    connect_result = adb.connect(device.ip_address, device.port)
+    output = connect_result.output.lower()
+
+    if "connected to" not in output and "already connected" not in output:
+        return device
+
+    return DiscoveredDevice(
+        ip_address=device.ip_address,
+        port=device.port,
+        manufacturer=get_device_property(device.target, "ro.product.manufacturer"),
+        model=get_device_property(device.target, "ro.product.model"),
+        android_version=get_device_property(device.target, "ro.build.version.release"),
+    )
+
+
+def identify_devices(
+    devices: tuple[DiscoveredDevice, ...],
+    workers: int = 8,
+) -> tuple[DiscoveredDevice, ...]:
+    identified_devices: list[DiscoveredDevice] = []
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(identify_device, device): device
+            for device in devices
+        }
+
+        for future in as_completed(futures):
+            identified_devices.append(future.result())
+
+    return tuple(
+        sorted(
+            identified_devices,
+            key=lambda device: ipaddress.ip_address(device.ip_address),
+        )
+    )    

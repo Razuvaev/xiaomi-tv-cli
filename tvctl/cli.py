@@ -369,6 +369,9 @@ def discover(
             port=port,
             timeout=timeout,
         )
+        if devices:
+            console.print("[cyan]Reading device information...[/cyan]")
+            devices = discovery.identify_devices(devices)
     except discovery.DiscoveryError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1) from error
@@ -382,16 +385,18 @@ def discover(
 
     table = Table(title=f"Found {len(devices)} device(s)")
     table.add_column("#", justify="right", style="cyan")
-    table.add_column("IP address")
-    table.add_column("Port", justify="right")
-    table.add_column("Target", style="green")
+    table.add_column("Manufacturer")
+    table.add_column("Model")
+    table.add_column("Android")
+    table.add_column("IP address", style="green")
 
     for index, device in enumerate(devices, start=1):
         table.add_row(
             str(index),
+            device.manufacturer,
+            device.model,
+            device.android_version,
             device.ip_address,
-            str(device.port),
-            device.target,
         )
 
     console.print(table)    
