@@ -1,0 +1,59 @@
+name: Safe
+description: Safe debloat profile for Xiaomi Android TV devices.
+
+packages:
+  - name: com.mitv.tvhome.atv
+    title: PatchWall
+    category: xiaomi
+
+  - name: com.mitv.tvhome.michannel
+    title: Mi Channel
+    category: xiaomi
+
+  - name: com.mitv.gallery
+    title: Mi Gallery
+    category: xiaomi
+
+  - name: com.mitv.dream
+    title: Xiaomi Screensaver
+    category: xiaomi
+
+  - name: com.xiaomi.mimusic2
+    title: Mi Music
+    category: xiaomi
+
+  - name: com.xiaomi.statistic
+    title: Xiaomi Statistics
+    category: analytics
+
+  - name: com.miui.tv.analytics
+    title: MIUI TV Analytics
+    category: analytics
+
+  - name: com.xm.webcontent
+    title: Xiaomi Web Content
+    category: xiaomi
+
+  - name: com.xiaomo.tv.milegal
+    title: Mi Legal
+    category: xiaomi
+
+  - name: com.xiaomi.floatingframe
+    title: Xiaomi Floating Frame
+    category: xiaomi
+
+  - name: com.google.android.leanbacklauncher.recommendations
+    title: Leanback Recommendations
+    category: google
+
+  - name: com.google.android.play.games
+    title: Google Play Games
+    category: google
+
+  - name: com.google.android.videos
+    title: Google TV Movies
+    category: google
+
+  - name: com.google.android.katniss
+    title: Google Assistant
+    category: google
