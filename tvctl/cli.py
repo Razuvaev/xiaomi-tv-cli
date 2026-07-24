@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from tvctl import adb, doctor, optimizer
+from tvctl import adb, doctor, optimizer, restorer
 from tvctl.profiles import ProfileError
 
 app = typer.Typer(
@@ -258,7 +258,79 @@ def optimize(
         console.print(f"[bold red]Completed with {failed_count} errors.[/bold red]")
         raise typer.Exit(code=1)
 
-    console.print("[bold green]✓ Optimization completed successfully.[/bold green]")        
+    console.print("[bold green]✓ Optimization completed successfully.[/bold green]")
+
+@app.command()
+def restore(
+    profile: Annotated[
+        Path,
+        typer.Option(
+            "--profile",
+            "-p",
+            help="Path to an optimization profile.",
+        ),
+    ] = Path("profiles/safe.yaml"),
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Restore packages without asking for confirmation.",
+        ),
+    ] = False,
+) -> None:
+    """Enable packages previously disabled by an optimization profile."""
+    try:
+        loaded_profile = restorer.load_profile(profile)
+        disabled_packages = restorer.get_disabled_packages(loaded_profile)
+    except (adb.ADBError, ProfileError) as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    if not disabled_packages:
+        console.print("[bold green]✓ Nothing to restore.[/bold green]")
+        return
+
+    table = Table(title=f"{loaded_profile.name} restore")
+    table.add_column("Component")
+    table.add_column("Category")
+    table.add_column("Package", style="dim")
+
+    for profile_package in disabled_packages:
+        table.add_row(
+            profile_package.title,
+            profile_package.category,
+            profile_package.name,
+        )
+
+    console.print(table)
+    console.print(f"[yellow]{len(disabled_packages)} packages will be enabled.[/yellow]")
+
+    if not yes and not typer.confirm("Continue?"):
+        console.print("[yellow]Restore cancelled.[/yellow]")
+        raise typer.Exit()
+
+    try:
+        results = restorer.run(profile)
+    except (adb.ADBError, ProfileError) as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    failed_count = 0
+
+    for result in results:
+        if result.success:
+            console.print(f"[green]✓ Enabled {result.package.title}[/green]")
+        else:
+            failed_count += 1
+            console.print(f"[red]✗ Failed to enable {result.package.title}[/red]")
+            console.print(f"[dim]{result.message}[/dim]")
+
+    if failed_count:
+        console.print(f"[bold red]Completed with {failed_count} errors.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]✓ Restore completed successfully.[/bold green]")    
 
 
 if __name__ == "__main__":
