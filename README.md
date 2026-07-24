@@ -61,6 +61,29 @@ Install the project:
 pip install -e ".[dev]"
 ```
 
+## Homebrew
+
+Install `tvctl` using Homebrew:
+
+```bash
+brew tap Razuvaev/tap
+brew install tvctl
+```
+
+`tvctl` requires Android Platform Tools (`adb`):
+
+```bash
+brew install --cask android-platform-tools
+```
+
+Verify the installation:
+
+```bash
+tvctl version
+tvctl --help
+```
+
+
 ## Usage
 
 Show available commands:
