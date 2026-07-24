@@ -42,20 +42,86 @@ def hello() -> None:
 
 @app.command()
 def connect(
-    ip_address: str = typer.Argument(
-        ...,
-        callback=validate_ip_address,
-        help="TV IP address, for example 192.168.1.40.",
-    ),
-    port: int = typer.Option(5555, min=1, max=65535, help="ADB TCP port."),
+    ip_address: Annotated[
+        str | None,
+        typer.Argument(
+            callback=lambda value: validate_ip_address(value) if value else None,
+            help="TV IP address. Omit it to discover TVs automatically.",
+        ),
+    ] = None,
+    port: Annotated[
+        int,
+        typer.Option(
+            "--port",
+            "-p",
+            min=1,
+            max=65535,
+            help="ADB TCP port.",
+        ),
+    ] = discovery.DEFAULT_ADB_PORT,
 ) -> None:
     """Connect to a TV over Wi-Fi using ADB."""
-    target = f"{ip_address}:{port}"
+    selected_ip_address = ip_address
 
+    if selected_ip_address is None:
+        try:
+            network = discovery.get_default_network()
+            console.print(f"[cyan]Scanning {network} on port {port}...[/cyan]")
+            devices = discovery.discover(network=network, port=port)
+
+            if not devices:
+                console.print("[yellow]⚠ No TVs with wireless ADB found.[/yellow]")
+                console.print("Make sure the TV is awake and USB debugging is enabled.")
+                raise typer.Exit(code=1)
+
+            identified_devices = discovery.identify_devices(devices)
+        except (adb.ADBError, discovery.DiscoveryError) as error:
+            console.print(f"[bold red]✗ {error}[/bold red]")
+            raise typer.Exit(code=1) from error
+
+        if len(identified_devices) == 1:
+            selected_device = identified_devices[0]
+            selected_ip_address = selected_device.ip_address
+            console.print(
+                f"[green]✓ Found {selected_device.manufacturer} "
+                f"{selected_device.model} at {selected_device.ip_address}[/green]"
+            )
+        else:
+            table = Table(title="Select a TV")
+            table.add_column("#", justify="right", style="cyan")
+            table.add_column("Manufacturer")
+            table.add_column("Model")
+            table.add_column("Android")
+            table.add_column("IP address", style="green")
+
+            for index, device in enumerate(identified_devices, start=1):
+                table.add_row(
+                    str(index),
+                    device.manufacturer,
+                    device.model,
+                    device.android_version,
+                    device.ip_address,
+                )
+
+            console.print(table)
+
+            selected_index = typer.prompt(
+                "TV number",
+                type=int,
+                default=1,
+            )
+
+            if selected_index < 1 or selected_index > len(identified_devices):
+                console.print("[bold red]✗ Invalid TV number.[/bold red]")
+                raise typer.Exit(code=1)
+
+            selected_ip_address = identified_devices[selected_index - 1].ip_address
+
+    target = f"{selected_ip_address}:{port}"
     console.print(f"[cyan]Connecting to {target}...[/cyan]")
 
     try:
-        result = adb.connect(ip_address, port)
+        result = adb.connect(selected_ip_address, port)
     except adb.ADBError as error:
         console.print(f"[bold red]✗ {error}[/bold red]")
         raise typer.Exit(code=1) from error
