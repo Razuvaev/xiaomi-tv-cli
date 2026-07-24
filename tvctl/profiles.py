@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+DEFAULT_PROFILE_PATH = Path(__file__).parent / "data" / "safe.yaml"
 
 class ProfileError(RuntimeError):
     pass

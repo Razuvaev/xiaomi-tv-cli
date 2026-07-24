@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Annotated
 
@@ -10,7 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from tvctl import adb, discovery, doctor, optimizer, restorer
-from tvctl.profiles import ProfileError
+from tvctl.profiles import DEFAULT_PROFILE_PATH, ProfileError
 
 app = typer.Typer(
     name="tvctl",
@@ -47,7 +48,10 @@ def show_setup_instructions() -> None:
 @app.command()
 def version() -> None:
     """Show the installed tvctl version."""
-    console.print("[bold cyan]xiaomi-tv-cli[/bold cyan] [green]0.1.0[/green]")
+    console.print(
+        f"[bold cyan]xiaomi-tv-cli[/bold cyan] "
+        f"[green]{package_version('xiaomi-tv-cli')}[/green]"
+    )
 
 
 @app.command()
@@ -238,7 +242,7 @@ def doctor_command(
             "-p",
             help="Path to an optimization profile.",
         ),
-    ] = Path("profiles/safe.yaml"),
+    ] = DEFAULT_PROFILE_PATH,
 ) -> None:
     """Check optimization status and show a health score."""
     try:
@@ -292,7 +296,7 @@ def optimize(
             "-p",
             help="Path to an optimization profile.",
         ),
-    ] = Path("profiles/safe.yaml"),
+    ] = DEFAULT_PROFILE_PATH,
     yes: Annotated[
         bool,
         typer.Option(
@@ -364,7 +368,7 @@ def restore(
             "-p",
             help="Path to an optimization profile.",
         ),
-    ] = Path("profiles/safe.yaml"),
+    ] = DEFAULT_PROFILE_PATH,
     yes: Annotated[
         bool,
         typer.Option(
