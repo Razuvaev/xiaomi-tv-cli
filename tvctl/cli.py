@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from tvctl import adb, doctor
+from tvctl import adb, doctor, optimizer
 from tvctl.profiles import ProfileError
 
 app = typer.Typer(
@@ -186,7 +186,79 @@ def doctor_command(
     )
 
     if report.score < 100:
-        console.print("Run [cyan]tvctl optimize[/cyan] to apply this profile.")        
+        console.print("Run [cyan]tvctl optimize[/cyan] to apply this profile.")
+
+@app.command()
+def optimize(
+    profile: Annotated[
+        Path,
+        typer.Option(
+            "--profile",
+            "-p",
+            help="Path to an optimization profile.",
+        ),
+    ] = Path("profiles/safe.yaml"),
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Apply changes without asking for confirmation.",
+        ),
+    ] = False,
+) -> None:
+    """Disable unnecessary packages from an optimization profile."""
+    try:
+        loaded_profile = optimizer.load_profile(profile)
+        enabled_packages = optimizer.get_enabled_packages(loaded_profile)
+    except (adb.ADBError, ProfileError) as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    if not enabled_packages:
+        console.print("[bold green]✓ Nothing to optimize. Profile is already applied.[/bold green]")
+        return
+
+    table = Table(title=f"{loaded_profile.name} optimization")
+    table.add_column("Component")
+    table.add_column("Category")
+    table.add_column("Package", style="dim")
+
+    for profile_package in enabled_packages:
+        table.add_row(
+            profile_package.title,
+            profile_package.category,
+            profile_package.name,
+        )
+
+    console.print(table)
+    console.print(f"[yellow]{len(enabled_packages)} packages will be disabled.[/yellow]")
+
+    if not yes and not typer.confirm("Continue?"):
+        console.print("[yellow]Optimization cancelled.[/yellow]")
+        raise typer.Exit()
+
+    try:
+        results = optimizer.run(profile)
+    except (adb.ADBError, ProfileError) as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    failed_count = 0
+
+    for result in results:
+        if result.success:
+            console.print(f"[green]✓ Disabled {result.package.title}[/green]")
+        else:
+            failed_count += 1
+            console.print(f"[red]✗ Failed to disable {result.package.title}[/red]")
+            console.print(f"[dim]{result.message}[/dim]")
+
+    if failed_count:
+        console.print(f"[bold red]Completed with {failed_count} errors.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]✓ Optimization completed successfully.[/bold green]")        
 
 
 if __name__ == "__main__":
