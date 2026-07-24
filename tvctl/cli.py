@@ -27,6 +27,22 @@ def validate_ip_address(ip_address: str) -> str:
     except ValueError as error:
         raise typer.BadParameter("Enter a valid IPv4 or IPv6 address.") from error
 
+def show_setup_instructions() -> None:
+    console.print(
+        Panel(
+            "[bold]1.[/bold] Open [cyan]Settings → About[/cyan]\n"
+            "[bold]2.[/bold] Press [cyan]Build[/cyan] 7 times to enable Developer options\n"
+            "[bold]3.[/bold] Return to Settings and open "
+            "[cyan]Developer options[/cyan]\n"
+            "[bold]4.[/bold] Enable [cyan]USB debugging[/cyan]\n"
+            "[bold]5.[/bold] Make sure the TV is awake and connected "
+            "to the same Wi-Fi network as this computer\n\n"
+            "[dim]Some Xiaomi firmware versions do not provide a separate "
+            "Wireless debugging option. Enabling USB debugging is usually sufficient.[/dim]",
+            title="Android TV setup",
+            border_style="yellow",
+        )
+    )        
 
 @app.command()
 def version() -> None:
@@ -70,9 +86,22 @@ def connect(
             devices = discovery.discover(network=network, port=port)
 
             if not devices:
-                console.print("[yellow]⚠ No TVs with wireless ADB found.[/yellow]")
-                console.print("Make sure the TV is awake and USB debugging is enabled.")
-                raise typer.Exit(code=1)
+                console.print("[yellow]⚠ No Android TV devices with wireless ADB were found.[/yellow]")
+                show_setup_instructions()
+
+                if not typer.confirm("Retry discovery?", default=True):
+                    raise typer.Exit(code=1)
+
+                console.print(f"[cyan]Scanning {network} again on port {port}...[/cyan]")
+                devices = discovery.discover(network=network, port=port)
+
+                if not devices:
+                    console.print("[bold red]✗ No Android TV devices were found.[/bold red]")
+                    console.print(
+                        "Check that the TV is awake, USB debugging is enabled, "
+                        "and both devices are connected to the same network."
+                    )
+                    raise typer.Exit(code=1)
 
             identified_devices = discovery.identify_devices(devices)
         except (adb.ADBError, discovery.DiscoveryError) as error:
@@ -443,10 +472,8 @@ def discover(
         raise typer.Exit(code=1) from error
 
     if not devices:
-        console.print("[yellow]⚠ No devices with wireless ADB found.[/yellow]")
-        console.print(
-            "Make sure the TV is awake and USB debugging is enabled."
-        )
+        console.print("[yellow]⚠ No Android TV devices with wireless ADB were found.[/yellow]")
+        show_setup_instructions()
         raise typer.Exit(code=1)
 
     table = Table(title=f"Found {len(devices)} device(s)")
