@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from tvctl import adb, discovery, doctor, optimizer, restorer
+from tvctl import adb, discovery, doctor, optimizer, report, restorer
 from tvctl.profiles import DEFAULT_PROFILE_PATH, ProfileError
 
 app = typer.Typer(
@@ -429,7 +429,27 @@ def restore(
         console.print(f"[bold red]Completed with {failed_count} errors.[/bold red]")
         raise typer.Exit(code=1)
 
-    console.print("[bold green]✓ Restore completed successfully.[/bold green]")    
+    console.print("[bold green]✓ Restore completed successfully.[/bold green]")
+
+@app.command("report")
+def report_command(
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Path for the diagnostic report."),
+    ] = Path("tvctl-report.txt"),
+) -> None:
+    """Collect a read-only diagnostic report from the connected Android TV."""
+    try:
+        report_path = report.create_report(output)
+    except adb.ADBError as error:
+        console.print(f"[bold red]✗ {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+    except OSError as error:
+        console.print(f"[bold red]✗ Failed to save report: {error}[/bold red]")
+        raise typer.Exit(code=1) from error
+
+    console.print(f"[bold green]✓ Report saved to {report_path}[/bold green]")
+    console.print("[dim]No settings were changed on the TV.[/dim]")    
 
 @app.command()
 def discover(
