@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 class ADBError(RuntimeError):
@@ -20,19 +22,33 @@ class ADBResult:
         return "\n".join(part for part in (self.stdout, self.stderr) if part).strip()
 
 
+def get_executable() -> str | None:
+    if getattr(sys, "frozen", False):
+        bundled_adb = Path(sys.executable).resolve().parent / ("adb.exe" if sys.platform == "win32" else "adb")
+        if bundled_adb.is_file():
+            return str(bundled_adb)
+
+    return shutil.which("adb")
+
+
 def is_installed() -> bool:
-    return shutil.which("adb") is not None
+    return get_executable() is not None
 
 
 def run(*arguments: str, timeout: float = 15) -> ADBResult:
-    if not is_installed():
-        raise ADBError(
-            "ADB is not installed. Install it with: brew install android-platform-tools"
-        )
+    adb_executable = get_executable()
+
+    if adb_executable is None:
+        if sys.platform == "darwin":
+            install_hint = "Install it with: brew install --cask android-platform-tools"
+        else:
+            install_hint = "Install Android Platform Tools or place adb next to tvctl."
+
+        raise ADBError(f"ADB is not installed. {install_hint}")
 
     try:
         process = subprocess.run(
-            ["adb", *arguments],
+            [adb_executable, *arguments],
             capture_output=True,
             text=True,
             timeout=timeout,
