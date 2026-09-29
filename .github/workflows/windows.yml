@@ -1,0 +1,59 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install pyinstaller
+
+      - name: Build tvctl.exe
+        run: |
+          pyinstaller --onefile --name tvctl --collect-data tvctl tvctl/cli.py
+
+      - name: Download Android Platform Tools
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://dl.google.com/android/repository/platform-tools-latest-windows.zip" `
+            -OutFile "platform-tools.zip"
+          Expand-Archive "platform-tools.zip" -DestinationPath "platform-tools"
+
+      - name: Prepare bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "bundle"
+          Copy-Item "dist/tvctl.exe" "bundle/tvctl.exe"
+          Copy-Item "platform-tools/platform-tools/adb.exe" "bundle/adb.exe"
+          Copy-Item "platform-tools/platform-tools/AdbWinApi.dll" "bundle/AdbWinApi.dll"
+          Copy-Item "platform-tools/platform-tools/AdbWinUsbApi.dll" "bundle/AdbWinUsbApi.dll"
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          .\bundle\tvctl.exe version
+          .\bundle\tvctl.exe --help
+
+      - name: Upload Windows bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvctl-windows-x64
+          path: bundle/*
