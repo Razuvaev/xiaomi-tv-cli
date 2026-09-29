@@ -51,6 +51,7 @@ jobs:
         run: |
           .\bundle\tvctl.exe version
           .\bundle\tvctl.exe --help
+          .\bundle\adb.exe version
 
       - name: Upload Windows bundle
         uses: actions/upload-artifact@v4
